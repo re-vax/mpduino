@@ -10,11 +10,23 @@
 #endif
 
 
+extern "C"
+{
+  // callback functions always follow the signature: void cmd(void);
+  typedef void (*objectCallbackFunction) (void);
+}
+
+
+
 enum gui_object_type {
-  GUI_OBJECT_TYPE_DUMMY1,
-  GUI_OBJECT_TYPE_DUMMY2,
   GUI_OBJECT_TYPE_NONE,
   GUI_OBJECT_TYPE_BUTTON
+};
+
+enum gui_button_status {
+  GUI_BUTTON_UP,
+  GUI_BUTTON_DOWN,
+  GUI_BUTTON_GRAYED
 };
 
 
@@ -22,9 +34,13 @@ enum gui_object_type {
 class GUI_Object
 {
 public:
-  int		type;
+  int	type;
   GUI_Object();
   virtual void draw(UTFT glcd)=0;
+  void setCallbackFunction(objectCallbackFunction action);
+//private:
+  objectCallbackFunction action;
+  
 };
 
 
@@ -32,11 +48,13 @@ public:
 class GUI_Button :  public GUI_Object
 {
 public:
-  int type;
+//  int type;
   int x1,y1,x2,y2;
+  int btn_status;
   String label;
   //GUI_Button();
   GUI_Button(int x1, int y1, int x2, int y2,String label);
+  GUI_Button(int x1, int y1, int x2, int y2,String label,boolean enabled);
   virtual void draw(UTFT glcd);
 };
 
