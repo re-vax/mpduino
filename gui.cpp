@@ -14,7 +14,8 @@ void GUI_Object::setCallbackFunction(objectCallbackFunction action){
 }
 
 
-GUI_Button:: GUI_Button(int x1,int y1,int x2,int y2,String label)
+
+GUI_Button:: GUI_Button(int x1,int y1,int x2,int y2)
 
 {
     type  = GUI_OBJECT_TYPE_BUTTON;
@@ -22,21 +23,33 @@ GUI_Button:: GUI_Button(int x1,int y1,int x2,int y2,String label)
     this->y1=y1;
     this->x2=x2;
     this->y2=y2;
-    this->label=label;
+    this->text=String();
+    this->btn_status=GUI_BUTTON_UP;
+}
+
+GUI_Button:: GUI_Button(int x1,int y1,int x2,int y2,String text)
+
+{
+    type  = GUI_OBJECT_TYPE_BUTTON;
+    this->x1=x1;
+    this->y1=y1;
+    this->x2=x2;
+    this->y2=y2;
+    this->text=text;
     this->btn_status=GUI_BUTTON_UP;
 }
 
 //  GUI_Button(x1,y1,x2,y2,label,true);
 
 
-GUI_Button:: GUI_Button(int x1,int y1,int x2,int y2,String label,boolean enabled)
+GUI_Button:: GUI_Button(int x1,int y1,int x2,int y2,String text,boolean enabled)
 {
     type  = GUI_OBJECT_TYPE_BUTTON;
     this->x1=x1;
     this->y1=y1;
     this->x2=x2;
     this->y2=y2;
-    this->label=label;
+    this->text=text;
     if (enabled) {
       this->btn_status=GUI_BUTTON_UP;
     } else {
@@ -57,7 +70,7 @@ void GUI_Button::draw(UTFT glcd)
       glcd.setColor(VGA_GRAY);
       glcd.drawRoundRect (x1, y1, x2, y2);
       glcd.setColor(VGA_BLACK);
-      glcd.print(label,x1+5,y1+3);
+      glcd.print(text,x1+5,y1+3);
     break;
     case GUI_BUTTON_DOWN:
       glcd.setBackColor(VGA_BLUE);
@@ -66,7 +79,7 @@ void GUI_Button::draw(UTFT glcd)
       glcd.setColor(VGA_NAVY);
       glcd.drawRoundRect (x1, y1, x2, y2);
       glcd.setColor(VGA_BLACK);
-      glcd.print(label,x1+5,y1+3);
+      glcd.print(text,x1+5,y1+3);
     break;
     case GUI_BUTTON_GRAYED:
       glcd.setBackColor(VGA_SILVER);
@@ -76,7 +89,7 @@ void GUI_Button::draw(UTFT glcd)
       glcd.drawRoundRect (x1, y1, x2, y2);
 //      glcd.drawRect (x1+1, y1+1, x2-1, y2-1);
       glcd.setColor(VGA_GRAY);
-      glcd.print(label,x1+5,y1+3);
+      glcd.print(text,x1+5,y1+3);
     break;
   }
 }
@@ -84,7 +97,8 @@ void GUI_Button::draw(UTFT glcd)
 
 GUI_Screen::  GUI_Screen(){
   this->root=NULL;
-  
+  this->need_refresh=false;
+  this->init_done=false;
 }
 
 int GUI_Screen::  draw(UTFT glcd){

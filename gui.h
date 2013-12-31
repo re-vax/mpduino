@@ -35,6 +35,7 @@ class GUI_Object
 {
 public:
   int	type;
+  boolean need_refresh;
   GUI_Object();
   virtual void draw(UTFT glcd)=0;
   void setCallbackFunction(objectCallbackFunction action);
@@ -51,10 +52,11 @@ public:
 //  int type;
   int x1,y1,x2,y2;
   int btn_status;
-  String label;
+  String text;
   //GUI_Button();
-  GUI_Button(int x1, int y1, int x2, int y2,String label);
-  GUI_Button(int x1, int y1, int x2, int y2,String label,boolean enabled);
+  GUI_Button(int x1, int y1, int x2, int y2);
+  GUI_Button(int x1, int y1, int x2, int y2,String text);
+  GUI_Button(int x1, int y1, int x2, int y2,String text,boolean enabled);
   virtual void draw(UTFT glcd);
 };
 
@@ -70,6 +72,10 @@ class GUI_Screen {
 public:
   GUI_ObjectList *root;
   GUI_Screen();
+  boolean init_done;
+  boolean need_refresh;
+  long backColor;
+  long frontColor;
   void add(GUI_Object *new_obj);
   int draw(UTFT glcd);
   GUI_Object * test_touch(int x,int y);

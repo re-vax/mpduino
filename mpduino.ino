@@ -41,9 +41,11 @@ enum mpc_status {
 };
 
 enum gui_screen {
+  GUI_NULL,
   GUI_INIT,
   GUI_CONNECT,
-  GUI_MPC_PLAYING,
+  GUI_MPD_PLAYER,
+  GUI_SETUP,
   GUI_TEST
 };
 
@@ -73,12 +75,19 @@ boolean test_gui_mode=false;
 
 osw_task exec;
 osw_dt_timer dt10sec;
+osw_dt_timer dt2sec;
 
-gui_screen current_displayed_gui_screen=GUI_INIT;
+gui_screen current_displayed_gui_screen=GUI_NULL;
+GUI_Screen *current_displayed_gui_screen_OBJ=NULL;
+gui_screen next_displayed_gui_screen=GUI_INIT;
 
-boolean process_touch_screen_in_progress=false;
+//boolean process_touch_screen_in_progress=false;
 
 MPD_Info mpd_info;
+osw_semaphore sem_mpd_info;
+osw_semaphore sem_mpc_status;
+osw_semaphore sem_current_screen;
+osw_semaphore sem_process_touchscreen;
 
 //*******************************
 
@@ -93,6 +102,7 @@ extern uint8_t SmallFont[];
 extern uint8_t BigFont[];
 extern unsigned int background[16];
 extern unsigned int btn1[2528];
+//extern unsigned int qrcode_revax_fr_export1[16383];
 
 
 // Uncomment the next two lines for the Arduino 2009/UNO
@@ -100,17 +110,24 @@ extern unsigned int btn1[2528];
 //UTouch      myTouch(15,10,14,9,8);
 
 // Uncomment the next two lines for the Arduino Mega
-
-
 UTFT        myGLCD(ITDB32S, 38,39,40,41);   // Remember to change the model parameter to suit your display module!
 UTouch      myTouch(6,5,4,3,2);
 
 // TouchScreen
 int touch_x, touch_y;
 
-// GUI
+// -------------====== GUI ==========-----------
 
-GUI_Screen gui_test=GUI_Screen();
+// ---------- MPD PLAYER ---------- 
+GUI_Screen gui_mpd_player=GUI_Screen();
+GUI_Button *button_play;
+GUI_Button *button_next_track;
+GUI_Button *button_previous_track;
+
+GUI_Button *button_setup;
+// --------- /MPD PLAYER ---------- 
+
+
 
 
 //*******************************
@@ -122,6 +139,8 @@ GUI_Screen gui_test=GUI_Screen();
 byte mac[] = { 
   0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED };
 IPAddress local_ip(192,168,90, 177);
+boolean dhcp=false;
+IPAddress ip(192,168,90, 19);
 
 IPAddress mpd_ip(192,168,90,10);
 int mpd_port=6600;
@@ -168,27 +187,69 @@ const int chipSelect = 9;
 //************************
 
 void draw_GUI(){
+//  sem_current_screen.semTake();
+
+  // Is this a new gui?
+  boolean isNewGui=false;
+  if (next_displayed_gui_screen!=GUI_NULL) {
+    Serial.print("Switch to wew gui:");
+    switch (next_displayed_gui_screen) {
+      case GUI_INIT:
+        Serial.println("GUI_INIT");
+        break;
+      case GUI_CONNECT:
+        Serial.println("GUI_CONNECT");
+        break;
+      case GUI_MPD_PLAYER:
+        Serial.println("GUI_MPD_PLAYER");
+        break;
+      case GUI_SETUP:
+        Serial.println("GUI_SETUP");
+        break;
+    }
+    
+    current_displayed_gui_screen=next_displayed_gui_screen;
+    next_displayed_gui_screen=GUI_NULL;
+    current_displayed_gui_screen_OBJ=NULL;
+    isNewGui=true;
+    
+  }
 
   switch (current_displayed_gui_screen) {
     case GUI_INIT:
+      if (isNewGui) {
+        init_gui_init();
+      }
       draw_gui_init();
     break;
 
     case GUI_CONNECT:
+      if (isNewGui) {
+        init_gui_connect();
+      }
       draw_gui_connect();
     break;
 
-    case GUI_MPC_PLAYING:
-      draw_gui_mpc_playing();
+    case GUI_MPD_PLAYER:
+      if (isNewGui) {
+        init_gui_mpd_player();
+        current_displayed_gui_screen_OBJ=&gui_mpd_player;        
+      }
+      draw_gui_mpd_player();
     break;
 
     case GUI_TEST:
-      draw_gui_test();
+//      draw_gui_test();
     break;
   }
+
+//  sem_current_screen.semGive();
 }
 
 
+
+void init_gui_init() {
+}
 
 void draw_gui_init() {
   myGLCD.fillScr(VGA_BLACK);
@@ -200,49 +261,97 @@ void draw_gui_init() {
   myGLCD.print("(c) Dr.vAx 2057",CENTER,70);
 }
 
-void draw_gui_connect() {
-  myGLCD.clrScr();
+
+
+void init_gui_connect() {
 }
 
-void draw_gui_mpc_playing() {
-  myGLCD.fillScr(VGA_BLACK);
-//  draw_MPC_Buttons();
-//  Serial.println("draw_gui_mpc_playing");
-  myGLCD.setColor(VGA_WHITE);
 
-  update_mpd_info();
+void draw_gui_connect() {
+  myGLCD.clrScr();
+  sem_mpc_status.semTake();
+  myGLCD.setColor(255, 0, 0);
+  if (mpc_status==MPC_DISCONNECTED){
+    myGLCD.print("DISCONNECTED!", CENTER , 80);
+  } else if (mpc_status==MPC_CONNECTING){
+    myGLCD.print("Connecting to MPD server!", CENTER , 80);
+  } else {
+//    myGLCD.print("Unable to connect to MPD server!", CENTER , 80);
+  }
+  sem_mpc_status.semGive();
+
+}
+
+
+void init_gui_mpd_player(){
+  if (!gui_mpd_player.init_done) {
+    Serial.println("init_gui_mpd_player");
+    gui_mpd_player.backColor=VGA_BLACK;  
+    gui_mpd_player.frontColor=VGA_WHITE;  
+  
+    button_play =new GUI_Button(5,20,95,60);
+    button_play->action=action_button_play;
+    gui_mpd_player.add(button_play);
+  
+    button_setup=new GUI_Button(5,200,95,220,"SETUP");
+    button_setup->action=action_button_setup;
+    gui_mpd_player.add(button_setup);
+    
+    button_previous_track=new GUI_Button(5,90,95,120,"|<<");
+    button_previous_track->action=action_button_previous_track;
+    gui_mpd_player.add(button_previous_track);
+
+    button_next_track=new GUI_Button(100,90,195,120,">>|");
+    button_next_track->action=action_button_next_track;
+    gui_mpd_player.add(button_next_track);
+
+    // init done
+    gui_mpd_player.init_done=true;
+  }
+
+}
+
+void draw_gui_mpd_player() {
+
+  sem_mpd_info.semTake();
+
+  myGLCD.fillScr(gui_mpd_player.backColor);
+  myGLCD.setColor(gui_mpd_player.frontColor);
+//  myGLCD.setFont(BigFont);
+
+
   switch (mpd_info.state) {
     case MPD_STATE_PLAY:
-      myGLCD.print("Now playing...",LEFT,5);
+      myGLCD.print("Now playing:",5,5);
+      button_play->text ="PAUSE";
       break;
     case MPD_STATE_PAUSE:
-      myGLCD.print("Now paused",LEFT,5);
+      myGLCD.print("Now paused:",5,5);
+      button_play->text="PLAY";
       break;
     case MPD_STATE_STOP:
-      myGLCD.print("Nothing if actually playing",LEFT,5);
+      myGLCD.print("Nothing if actually playing",5,5);
+      button_play->text="PLAY";
       break;
   }
+  
+  myGLCD.drawLine(0,18,102,18);
+  myGLCD.drawLine(102,18,102,85);
+  myGLCD.drawLine(102,85,319,85);
 
   if (mpd_info.state==MPD_STATE_PLAY || mpd_info.state==MPD_STATE_PAUSE) {
-    myGLCD.print(mpd_info.artist,LEFT,25);
-    myGLCD.print(mpd_info.title,LEFT,45);
-    myGLCD.print(mpd_info.album,LEFT,65);
-    myGLCD.print(mpd_info.album_date,LEFT,85);
+    myGLCD.print(mpd_info.artist,105,5);
+    myGLCD.print(mpd_info.title,105,25);
+    myGLCD.print(mpd_info.album,105,45);
+    myGLCD.print(mpd_info.album_date,105,65);
   }
 
-  GUI_Button *button_setup=new GUI_Button(10,200,100,220,"SETUP");
-  button_setup->action=action_button_setup;
-  gui_test.add(button_setup);
+//  myGLCD.drawBitmap(180,200-128,128,128,qrcode_revax_fr_export1);
 
-//  GUI_Button *button_test=new GUI_Button(10,110,130,140,"Test!");
-//  button_test->btn_status=GUI_BUTTON_DOWN;
-//  gui_test.add(button_test);
+  gui_mpd_player.draw(myGLCD);
 
-//  GUI_Button *button_test2=new GUI_Button(140,110,290,140,"DISABLED",false);
-//  gui_test.add(button_test2);
-
-  gui_test.draw(myGLCD);
-
+  sem_mpd_info.semGive();
+  
 }
 
 
@@ -275,28 +384,6 @@ void test_btn3(){
 }
 
 
-void draw_gui_test() {
-  myGLCD.fillScr(VGA_BLACK);
-
-  GUI_Button *button_status=new GUI_Button(10,10,130,40,"BUTTON1");
-  button_status->action=test_btn1;
-  gui_test.add(button_status);
-
-  GUI_Button *button_test=new GUI_Button(10,110,130,140,"Test!");
-//  button_test->btn_status=GUI_BUTTON_DOWN;
-  button_test->action=test_btn2;
-  gui_test.add(button_test);
-
-  GUI_Button *button_test2=new GUI_Button(140,110,290,140,"BUTTON3");
-  button_test2->action=test_btn3;
-  gui_test.add(button_test2);
-
-  gui_test.draw(myGLCD);
-
-}
-
-
-
 
 void init_GUI_MPC(){
 }
@@ -312,14 +399,40 @@ void draw_background(){
   }  
 }
 
-void mpd_play_pause_action(){
-
+void action_button_play(){
+//       mpd_client.println("pause"); 
+  sem_mpd_info.semTake();
+  if (mpd_info.state==MPD_STATE_STOP){
+    sendMPDCommandAndWaitForResponse("play");
+  } else {
+    sendMPDCommandAndWaitForResponse("pause");
+  }
+  sem_mpd_info.semGive();
 }
-//            mpd_client.println("pause");            
+
+void action_button_previous_track(){
+  sem_mpd_info.semTake();
+  if (mpd_info.state!=MPD_STATE_STOP){
+    sendMPDCommandAndWaitForResponse("previous");
+  }
+  sem_mpd_info.semGive();
+}
+
+void action_button_next_track(){
+  sem_mpd_info.semTake();
+  if (mpd_info.state!=MPD_STATE_STOP){
+    sendMPDCommandAndWaitForResponse("next");
+  }
+  sem_mpd_info.semGive();
+}
+
 
 
 void action_button_setup(){
-  
+    sem_current_screen.semTake();
+    next_displayed_gui_screen=GUI_SETUP;
+    sem_current_screen.semGive();
+    
 }
 
 
@@ -336,16 +449,21 @@ void action_button_setup(){
 */
 
 void process_touch_screen(){
-  if (process_touch_screen_in_progress) {
-    return;
-  }
-  process_touch_screen_in_progress=true;
+
+//  Serial.print("process touch!");
+  
+  sem_process_touchscreen.semTake();
+//  if (process_touch_screen_in_progress) {
+//    return;
+//  }
+
+//  process_touch_screen_in_progress=true;
   if (myTouch.dataAvailable()) { 
     myTouch.read();
     touch_x=myTouch.getX();
     touch_y=myTouch.getY();
 
-    GUI_Object * obj = gui_test.test_touch(touch_x,touch_y);
+    GUI_Object * obj = gui_mpd_player.test_touch(touch_x,touch_y);
     if (obj!=NULL) {
         if (obj->type==GUI_OBJECT_TYPE_BUTTON) {
           if (((GUI_Button*) obj)->btn_status==GUI_BUTTON_GRAYED) {
@@ -353,12 +471,12 @@ void process_touch_screen(){
           } else {
             
             if (((GUI_Button*) obj)->btn_status==GUI_BUTTON_UP) {
-              Serial.print("Button pressed: ");
-              Serial.println(((GUI_Button*)obj)->label);
-              Serial.print("pos down: ");
-              Serial.print(touch_x);
-              Serial.print(",");
-              Serial.println(touch_y);
+           //   Serial.print("Button pressed: ");
+           //   Serial.println(((GUI_Button*)obj)->label);
+           //   Serial.print("pos down: ");
+           //   Serial.print(touch_x);
+           //   Serial.print(",");
+           //   Serial.println(touch_y);
 
               ((GUI_Button*) obj)->btn_status=GUI_BUTTON_DOWN;
               obj->draw(myGLCD);
@@ -371,10 +489,10 @@ void process_touch_screen(){
                   touch_x=myTouch.getX();
                   touch_y=myTouch.getY();
                   // Get the object under the pointer
-                  lastObj = gui_test.test_touch(touch_x,touch_y);
+                  lastObj = gui_mpd_player.test_touch(touch_x,touch_y);
                   if (lastObj==obj) {
                     if (((GUI_Button*) obj)->btn_status==GUI_BUTTON_UP) {
-                      Serial.println("lastObj==obj and btn status is UP");
+                     // Serial.println("lastObj==obj and btn status is UP");
   
                       ((GUI_Button*) obj)->btn_status=GUI_BUTTON_DOWN;
                       obj->draw(myGLCD);
@@ -382,7 +500,7 @@ void process_touch_screen(){
                     }
                   }
                   else {
-                    Serial.println("lastObj != obj");
+                  //  Serial.println("lastObj != obj");
   
                     if (((GUI_Button*) obj)->btn_status==GUI_BUTTON_DOWN) {
                       ((GUI_Button*) obj)->btn_status=GUI_BUTTON_UP;
@@ -395,7 +513,7 @@ void process_touch_screen(){
                 // Already released
                 lastObj=obj;
               }
-              
+             /* 
               Serial.print("pos UP: ");
               Serial.print(touch_x);
               Serial.print(",");
@@ -403,8 +521,9 @@ void process_touch_screen(){
 
               
               Serial.println("released");
-              if (lastObj==obj && ((GUI_Button*) obj)->btn_status==GUI_BUTTON_DOWN ) {
-              Serial.println("same obj and status is down");
+*/
+            if (lastObj==obj && ((GUI_Button*) obj)->btn_status==GUI_BUTTON_DOWN ) {
+              //Serial.println("same obj and status is down");
                 if (obj->action != NULL){
                   ((GUI_Button*) obj)->btn_status=GUI_BUTTON_UP;
                   obj->draw(myGLCD);
@@ -432,7 +551,8 @@ void process_touch_screen(){
 
     }
   }
-  process_touch_screen_in_progress=false;
+//  process_touch_screen_in_progress=false;
+  sem_process_touchscreen.semGive();
 
 }
 
@@ -555,24 +675,55 @@ void process_ethernet_server(){
 */
 
 
+void check_mpc_status() {
+//  if (mpd_client_status!=MPD_CLIENT_CONNECTED && mpd_client_status!=MPD_CLIENT_CONNECTING) {
+
+  sem_current_screen.semTake();
+  sem_mpc_status.semTake();
+
+  if (mpc_status!=MPC_CONNECTED) {
+    connect_mpc();
+  }
+
+  if (mpc.connected() || fake_connected ) {
+    // is connected -> switch to player
+    if (current_displayed_gui_screen!=GUI_MPD_PLAYER){
+      next_displayed_gui_screen=GUI_MPD_PLAYER;
+    }  
+  } else {
+    // is not connected
+    if (current_displayed_gui_screen!=GUI_CONNECT) { // || mpd_client_status==MPD_CLIENT_UNKNOWN) {
+      // but was in previous test
+      // we need to update the display
+      next_displayed_gui_screen=GUI_CONNECT;
+      mpc_status=MPC_DISCONNECTED;
+     }
+  }
+
+
+  sem_mpc_status.semGive();
+  sem_current_screen.semGive();
+
+
+}
 
 
 void connect_mpc(){
-  if (mpc_status!=MPC_CONNECTED) {
+  if (mpc_status!=MPC_CONNECTED && mpc_status!=MPC_CONNECTING) {
     // Trying to connnect
-    // connect client to mpd server
 
+    // connect client to mpd server
     mpc_status=MPC_CONNECTING;
-    myGLCD.setColor(VGA_WHITE);
-    myGLCD.print("Connecting to MPD server...", CENTER, 100);
     Serial.println("Connecting to MPD server...");
 
-//    while (!mpd_client){
-//      ;
-//    }
-
+/*    while (!mpc){
+      delay(1);
+    }
+*/
     if (mpc.connect(mpd_ip, mpd_port)) {
       Serial.println("Connected to MPD server");
+      mpc_status=MPC_CONNECTED;
+
       // Flush the OK
       if (mpc.available()) {
         while (mpc.available()) {
@@ -585,6 +736,7 @@ void connect_mpc(){
     else {
       // if you didn't get a connection to the server:
       Serial.println("Connection to MPD server failed");
+      mpc_status=MPC_DISCONNECTED;
       mpc.stop();
 
 //      mpd_client_status=MPD_CLIENT_DISCONNECTED;
@@ -594,41 +746,7 @@ void connect_mpc(){
 }
 
 
-void update_mpc_status(){
- 
-//   if (mpd_client_status!=MPD_CLIENT_CONNECTING ) {
 
-     if (mpc.connected() || fake_connected ) {
-      // is connected
-      if (mpc_status!=MPC_CONNECTED ) {
-        // but was not in previous test
-        // we need to update the display
-  
-        myGLCD.setColor(VGA_RED);
-        myGLCD.print("Connected", CENTER, 100);
-        mpc_status=MPC_CONNECTED;
-        current_displayed_gui_screen=GUI_MPC_PLAYING;
-        draw_GUI();
-  
-      }
-    } else {
-      // is not connected
-      if (mpc_status==MPC_CONNECTED) { // || mpd_client_status==MPD_CLIENT_UNKNOWN) {
-        // but was in previous test
-        // we need to update the display
-        current_displayed_gui_screen=GUI_CONNECT;
-        draw_GUI();
-        myGLCD.setColor(255, 0, 0);
-        if (mpc_status==MPC_CONNECTED){
-          myGLCD.print("Lost connection to MPD server!", CENTER , 100);
-        } else {
-          myGLCD.print("Unable to connect to MPD server!", CENTER , 100);
-        }
-        mpc_status=MPC_DISCONNECTED;
-     }
-    }
-//   }
-}
 
 
 
@@ -652,22 +770,44 @@ void sendMPDCommandAndWaitForResponse(String command){
 void getMPDStatus(){
 }
 
-void update_mpd_info(){
-
+boolean update_mpd_info(){
+  
+  boolean retval=false;
+  
+  MPD_Info old_mpd_info;
+  old_mpd_info.state=mpd_info.state;
+  old_mpd_info.volume=mpd_info.volume;
+  old_mpd_info.time=mpd_info.time;
+  old_mpd_info.artist=mpd_info.artist;
+  old_mpd_info.album=mpd_info.album;
+  old_mpd_info.title=mpd_info.title;
+  old_mpd_info.album_date=mpd_info.album_date;
+  
+  mpd_info.artist=String();
+  mpd_info.album=String();
+  mpd_info.title=String();
+  mpd_info.album_date=String();
+  
   String currentLine=String();
   sendMPDCommandAndWaitForResponse("status");
   if (mpc.available()) {
     while (mpc.available()) {
       char c = mpc.read();
       if (c==10) {
-        Serial.println(currentLine);
            if (currentLine.startsWith("volume:")) {
-             mpd_info.volume=currentLine.substring(currentLine.indexOf(":")).toInt();
+             mpd_info.volume=currentLine.substring(currentLine.indexOf(":")+2).toInt();
            } else if (currentLine.startsWith("time:")) {
-             mpd_info.time=currentLine.substring(currentLine.indexOf(":")).toInt();
+             mpd_info.time=currentLine.substring(currentLine.indexOf(":")+2).toInt();
            } else if (currentLine.startsWith("state:")) {
+             Serial.println(currentLine);
              if (currentLine.endsWith("play")) {
                mpd_info.state=MPD_STATE_PLAY;
+             }
+             if (currentLine.endsWith("stop")) {
+               mpd_info.state=MPD_STATE_STOP;
+             }
+             if (currentLine.endsWith("pause")) {
+               mpd_info.state=MPD_STATE_PAUSE;
              }
            }        
          currentLine=String();
@@ -684,16 +824,16 @@ void update_mpd_info(){
     while (mpc.available()) {
       char c = mpc.read();
       if (c==10) {
-        Serial.println(currentLine);
+//        Serial.println(currentLine);
            if (currentLine.startsWith("Artist:")) {
-             mpd_info.artist=currentLine.substring(currentLine.indexOf(":")+1);
+             mpd_info.artist=currentLine.substring(currentLine.indexOf(":")+2);
 //mpd_info.artist="popof";
            } else if (currentLine.startsWith("Title:")) {
-             mpd_info.title=currentLine.substring(currentLine.indexOf(":"));
+             mpd_info.title=currentLine.substring(currentLine.indexOf(":")+2);
            } else if (currentLine.startsWith("Album:")) {
-             mpd_info.album=currentLine.substring(currentLine.indexOf(":"));
+             mpd_info.album=currentLine.substring(currentLine.indexOf(":")+2);
            } else if (currentLine.startsWith("Date:")) {
-             mpd_info.album_date=currentLine.substring(currentLine.indexOf(":"));
+             mpd_info.album_date=currentLine.substring(currentLine.indexOf(":")+2);
            }        
          currentLine=String();
       } else { 
@@ -703,7 +843,14 @@ void update_mpd_info(){
   } else {
     Serial.println("mpd client not ready");
   }
+
+  if ( (old_mpd_info.state!=mpd_info.state) ||  (!old_mpd_info.artist.equals(mpd_info.artist)) || (!old_mpd_info.album.equals(mpd_info.album)) || (!old_mpd_info.title.equals(mpd_info.title)) || (!old_mpd_info.album_date.equals(mpd_info.album_date)) ) {
+//  if ( (!old_mpd_info.artist.equals(mpd_info.artist)) || (!old_mpd_info.album.equals(mpd_info.album)) || (!old_mpd_info.title.equals(mpd_info.title)) || (!old_mpd_info.album_date.equals(mpd_info.album_date)) ) {
+    retval=true;
+  }
   
+
+  return retval;
 }
 
 //***************************
@@ -714,6 +861,8 @@ void executive_init(void)
 {
   dt10sec.start(2000); // First start after 2sec
   osw_evt_register(1, evt10s);
+  dt2sec.start(5000); // First start after 2sec
+  osw_evt_register(2, evt2s);
 }
 
 void* executive(void* _pData)
@@ -723,16 +872,73 @@ void* executive(void* _pData)
     osw_evt_publish(1);
     dt10sec.start(10000);
   }
+
+  if (dt2sec.timedOut()) {
+    osw_evt_publish(2);
+    dt2sec.start(2000);
+  }
   
+
+  // ---------- Refresh GUI ----------
+  sem_current_screen.semTake();
+  if ( (current_displayed_gui_screen_OBJ!=NULL && current_displayed_gui_screen_OBJ->need_refresh ) || (next_displayed_gui_screen!=GUI_NULL) ){
+    
+    // reset the need_refresh flag
+    if (current_displayed_gui_screen_OBJ!=NULL && current_displayed_gui_screen_OBJ->need_refresh ) {
+      current_displayed_gui_screen_OBJ->need_refresh=false;
+    }
+    
+    draw_GUI();
+
+  }  
+  sem_current_screen.semGive();
+  // ---------- End Of Refresh GUI ----------
+
+
+
+  // Test the touchscreen
   process_touch_screen();
-  
+
+/*
+  int res_sem=sem_process_touchscreen.semTake(10);
+  if (res_sem==1) {
+    sem_process_touchscreen.semGive();
+    process_touch_screen();
+  }
+  */
 }
 
 
 void evt10s(int _evt)
 {
 //  Serial.println("evt10s");
-  check_mpd_client();
+  check_mpc_status();
+}
+
+void evt2s(int _evt)
+{
+  osw_print_mem_free();  
+  
+  sem_mpc_status.semTake();
+  int local_mpc_status=mpc_status;
+  sem_mpc_status.semGive();
+
+  if (local_mpc_status==MPC_CONNECTED) {
+
+    sem_mpd_info.semTake();
+    boolean need_update=update_mpd_info();
+    sem_mpd_info.semGive();
+
+    if (need_update) {
+    // if true we need to refresh (data changes)
+      sem_current_screen.semTake();
+      if (current_displayed_gui_screen==GUI_MPD_PLAYER){
+//        draw_GUI();
+        current_displayed_gui_screen_OBJ->need_refresh=true;
+      }
+      sem_current_screen.semGive();
+    }
+  }
 }
 
 
@@ -742,7 +948,12 @@ void evt10s(int _evt)
 
 void setup()
 {
-  
+
+  // disable SD SPI
+  pinMode(chipSelect,OUTPUT);
+  digitalWrite(chipSelect,HIGH);
+
+
    Serial.begin(9600);
    while (!Serial) {
     ; // wait for serial port to connect. Needed for Leonardo only
@@ -783,42 +994,36 @@ void setup()
 
   int connected=0;
   while (connected==0){
-    connected=Ethernet.begin(mac);
-    delay(500);
+    if (dhcp) {
+      connected=Ethernet.begin(mac);
+    } else {
+      Ethernet.begin(mac,ip);
+      connected=1;
+    }
+  delay(500);
   }
-  
+
   
 //  and the server:
 //  server.begin();
-//  Serial.print("server is at ");
-//  Serial.println(Ethernet.localIP());
+  Serial.print("Local IP:");
+  Serial.println(Ethernet.localIP());
 
   // System
-  if (!test_gui_mode) {
-    executive_init();
-  }
+  sem_mpd_info.semCreate("smi");
+  sem_mpc_status.semCreate("sms");
+  sem_current_screen.semCreate("scs");
+  sem_process_touchscreen.semCreate("spt");
+
+  executive_init();
   exec.taskCreate("exec", executive);
-
-//  osw_list_tasks();
-
-  if (test_gui_mode) {
-    current_displayed_gui_screen=GUI_TEST;
-  } else {
-    current_displayed_gui_screen=GUI_CONNECT;
-  }
-  draw_GUI();
+  next_displayed_gui_screen=GUI_CONNECT;
+//  draw_GUI();
   
 }
 
 
 
-void check_mpd_client() {
-//  if (mpd_client_status!=MPD_CLIENT_CONNECTED && mpd_client_status!=MPD_CLIENT_CONNECTING) {
-  if (mpc_status!=MPC_CONNECTED) {
-    connect_mpc(); 
-  }
-  update_mpc_status();
-}
 
 
 void loop()
