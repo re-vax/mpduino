@@ -20,7 +20,8 @@ extern "C"
 
 enum gui_object_type {
   GUI_OBJECT_TYPE_NONE,
-  GUI_OBJECT_TYPE_BUTTON
+  GUI_OBJECT_TYPE_BUTTON,
+  GUI_OBJECT_TYPE_LABEL
 };
 
 enum gui_button_status {
@@ -28,6 +29,10 @@ enum gui_button_status {
   GUI_BUTTON_DOWN,
   GUI_BUTTON_GRAYED
 };
+
+// just a class definition
+class GUI_Screen;
+
 
 
 // Common object class
@@ -41,8 +46,15 @@ public:
   void setCallbackFunction(objectCallbackFunction action);
 //private:
   objectCallbackFunction action;
-  
+  GUI_Screen *gui_screen;
 };
+
+
+struct GUI_ObjectList{
+  GUI_Object *obj;
+  GUI_ObjectList * next;
+};
+
 
 
 // Button
@@ -50,20 +62,36 @@ class GUI_Button :  public GUI_Object
 {
 public:
 //  int type;
-  int x1,y1,x2,y2;
+  int x1,y1,xsize,ysize;
   int btn_status;
   String text;
+  uint8_t* font;
+  word buttonColor,textColor,borderColor,pressedButtonColor;
   //GUI_Button();
-  GUI_Button(int x1, int y1, int x2, int y2);
-  GUI_Button(int x1, int y1, int x2, int y2,String text);
-  GUI_Button(int x1, int y1, int x2, int y2,String text,boolean enabled);
+  GUI_Button(int x1, int y1, int xsize, int ysize);
+  GUI_Button(int x1, int y1, int xsize, int ysize,String text);
+  GUI_Button(int x1, int y1, int xsize, int ysize,String text,boolean enabled);
+  void setText(String text);
+  void setFont(uint8_t* font);
+  void setColors(word buttonColor,word textColor,word borderColor,word pressedButtonColor);
   virtual void draw(UTFT glcd);
 };
 
 
-struct GUI_ObjectList{
-  GUI_Object *obj;
-  GUI_ObjectList * next;
+// Label
+class GUI_Label :  public GUI_Object
+{
+public:
+  int x,y;
+  String text;
+  word textColor;
+  uint8_t* font;
+  GUI_Label(int x, int y);
+  GUI_Label(int x, int y,String text);
+  void setText(String text);
+  void setFont(uint8_t* font);
+  void setColor(word textColor);
+  virtual void draw(UTFT glcd);
 };
 
 
@@ -75,9 +103,11 @@ public:
   boolean init_done;
   boolean need_refresh;
   long backColor;
-  long frontColor;
+  long defaultFrontColor;
+  uint8_t *defaultFont;
   void add(GUI_Object *new_obj);
   int draw(UTFT glcd);
+  int draw(UTFT glcd,boolean fullRedraw);
   GUI_Object * test_touch(int x,int y);
   
   String list_obj();

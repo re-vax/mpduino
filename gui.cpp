@@ -14,100 +14,183 @@ void GUI_Object::setCallbackFunction(objectCallbackFunction action){
 }
 
 
-
-GUI_Button:: GUI_Button(int x1,int y1,int x2,int y2)
-
+GUI_Label::GUI_Label(int x,int y,String text)
 {
-    type  = GUI_OBJECT_TYPE_BUTTON;
-    this->x1=x1;
-    this->y1=y1;
-    this->x2=x2;
-    this->y2=y2;
-    this->text=String();
-    this->btn_status=GUI_BUTTON_UP;
+    type  = GUI_OBJECT_TYPE_LABEL;
+    this->x=x;
+    this->y=y;
+    this->text=text;
+    this->need_refresh=true;
 }
 
-GUI_Button:: GUI_Button(int x1,int y1,int x2,int y2,String text)
+GUI_Label::GUI_Label(int x,int y)
+{
+    type  = GUI_OBJECT_TYPE_LABEL;
+    this->x=x;
+    this->y=y;
+    this->text=String();
+    this->need_refresh=true;
+}
+
+void GUI_Label:: setText(String text)
+{
+    this->text=text;
+    this->need_refresh=true;
+}
+
+void GUI_Label:: setFont(uint8_t* font)
+{
+  this->font=font;
+}
+
+void GUI_Label::setColor(word textColor) {
+  this->textColor=textColor;
+  this->need_refresh=true;
+}
+
+
+void GUI_Label:: draw(UTFT glcd)
+{
+   glcd.setColor(this->textColor);
+   glcd.setFont(this->font);
+   glcd.print(this->text,this->x,this->y);
+   this->need_refresh=false;
+}
+
+GUI_Button:: GUI_Button(int x1,int y1,int xsize,int ysize)
 
 {
     type  = GUI_OBJECT_TYPE_BUTTON;
     this->x1=x1;
     this->y1=y1;
-    this->x2=x2;
-    this->y2=y2;
+    this->xsize=xsize;
+    this->ysize=ysize;
+    this->text=String();
+    this->btn_status=GUI_BUTTON_UP;
+    this->need_refresh=true;  
+    
+    //GUI_Button(x1,y1,xsize,ysize,String());
+}
+
+GUI_Button:: GUI_Button(int x1,int y1,int xsize,int ysize,String text)
+
+{
+//    GUI_Button(x1,y1,xsize,ysize,text, true);
+    type  = GUI_OBJECT_TYPE_BUTTON;
+    this->x1=x1;
+    this->y1=y1;
+    this->xsize=xsize;
+    this->ysize=ysize;
     this->text=text;
     this->btn_status=GUI_BUTTON_UP;
+    this->need_refresh=true;
 }
 
 //  GUI_Button(x1,y1,x2,y2,label,true);
 
 
-GUI_Button:: GUI_Button(int x1,int y1,int x2,int y2,String text,boolean enabled)
+GUI_Button:: GUI_Button(int x1,int y1,int xsize,int ysize,String text,boolean enabled)
 {
     type  = GUI_OBJECT_TYPE_BUTTON;
     this->x1=x1;
     this->y1=y1;
-    this->x2=x2;
-    this->y2=y2;
+    this->xsize=xsize;
+    this->ysize=ysize;
     this->text=text;
     if (enabled) {
       this->btn_status=GUI_BUTTON_UP;
     } else {
       this->btn_status=GUI_BUTTON_GRAYED;
     }
+    this->need_refresh=true;  
+}
+
+void GUI_Button:: setText(String text)
+{
+  this->text=text;
+  this->need_refresh=true;  
+}
+
+void GUI_Button::setColors(word buttonColor,word textColor,word borderColor,word pressedButtonColor){
+  this->buttonColor=buttonColor;
+  this->textColor=textColor;
+  this->borderColor=borderColor;
+  this->pressedButtonColor=pressedButtonColor;
+  this->need_refresh=true;
+}
+
+
+void GUI_Button:: setFont(uint8_t* font)
+{
+  this->font=font;
 }
 
 void GUI_Button::draw(UTFT glcd)
 {
 
-  glcd.setFont(BigFont);
+  glcd.setFont(font);
 
   switch (this->btn_status) {
     case GUI_BUTTON_UP:
-      glcd.setBackColor(VGA_SILVER);
-      glcd.setColor(VGA_SILVER);
-      glcd.fillRoundRect (x1, y1, x2, y2);
-      glcd.setColor(VGA_GRAY);
-      glcd.drawRoundRect (x1, y1, x2, y2);
-      glcd.setColor(VGA_BLACK);
+      glcd.setBackColor(buttonColor);
+      glcd.setColor(buttonColor);
+      glcd.fillRoundRect (x1, y1, x1+xsize-1, y1+ysize-1);
+      glcd.setColor(borderColor);
+      glcd.drawRoundRect (x1, y1, x1+xsize-1, y1+ysize-1);
+      glcd.setColor(textColor);
       glcd.print(text,x1+5,y1+3);
     break;
     case GUI_BUTTON_DOWN:
-      glcd.setBackColor(VGA_BLUE);
-      glcd.setColor(VGA_BLUE);
-      glcd.fillRoundRect (x1, y1, x2, y2);
-      glcd.setColor(VGA_NAVY);
-      glcd.drawRoundRect (x1, y1, x2, y2);
-      glcd.setColor(VGA_BLACK);
+      glcd.setBackColor(pressedButtonColor);
+      glcd.setColor(pressedButtonColor);
+      glcd.fillRoundRect (x1, y1, x1+xsize-1, y1+ysize-1);
+      glcd.setColor(borderColor);
+      glcd.drawRoundRect (x1, y1, x1+xsize-1, y1+ysize-1);
+      glcd.setColor(textColor);
       glcd.print(text,x1+5,y1+3);
     break;
     case GUI_BUTTON_GRAYED:
       glcd.setBackColor(VGA_SILVER);
       glcd.setColor(VGA_SILVER);
-      glcd.fillRoundRect (x1, y1, x2, y2);
+      glcd.fillRoundRect (x1, y1, x1+xsize-1, y1+ysize-1);
       glcd.setColor(VGA_SILVER);
-      glcd.drawRoundRect (x1, y1, x2, y2);
+      glcd.drawRoundRect (x1, y1, x1+xsize-1, y1+ysize-1);
 //      glcd.drawRect (x1+1, y1+1, x2-1, y2-1);
       glcd.setColor(VGA_GRAY);
       glcd.print(text,x1+5,y1+3);
     break;
   }
+  this->need_refresh=false;
+
 }
 
 
 GUI_Screen::  GUI_Screen(){
   this->root=NULL;
+  this->defaultFont=NULL;
   this->need_refresh=false;
   this->init_done=false;
 }
 
+
 int GUI_Screen::  draw(UTFT glcd){
+  return draw(glcd,false);
+}
+
+int GUI_Screen::  draw(UTFT glcd,boolean fullRedraw){
+  // clrscr if full redraw
+  if (fullRedraw) {
+    glcd.fillScr(backColor);
+  }
+
   int count=0;
   GUI_ObjectList *current_object=this->root;
-  while (current_object!=NULL && count<20) {
+  while (current_object!=NULL && count<50) {
     count++;
     GUI_Object *obj= current_object->obj;
-    obj->draw(glcd);
+    if (fullRedraw || obj->need_refresh) {
+      obj->draw(glcd);
+    }
     current_object=current_object->next;
   }
   return count;
@@ -133,7 +216,7 @@ void GUI_Screen:: add(GUI_Object *new_obj){
   } else {
     obj->next=new_obj_item;
   }
-  
+  new_obj->gui_screen=this;
   
 }
 
@@ -161,7 +244,7 @@ GUI_Object * GUI_Screen::test_touch(int x,int y){
   while (obj!=NULL) {
     if (obj->obj->type == GUI_OBJECT_TYPE_BUTTON) {
       GUI_Button *btn=(GUI_Button*)(obj->obj);
-      if (x>btn->x1 && x<btn->x2 && y>btn->y1 && y<btn->y2 ) {
+      if (x>=btn->x1 && x<btn->x1+btn->xsize && y>=btn->y1 && y<btn->y1+btn->ysize ) {
         return btn;
       }
      obj=obj->next;
