@@ -72,6 +72,7 @@ public:
   GUI_Button(int x, int y, int xsize, int ysize,String text);
   GUI_Button(int x, int y, int xsize, int ysize,String text,boolean enabled);
   void setText(String text);
+  void setStatus(gui_button_status new_button_status);
   void setFont(uint8_t* font);
   void setColors(word buttonColor,word textColor,word borderColor,word pressedButtonColor);
   virtual void draw(UTFT glcd);

@@ -565,18 +565,24 @@ void process_touch_screen(){
               Serial.println("trace A");
               GUI_Object * lastObj;
               if (myTouch.dataAvailable()) {
+                int loop_count=0;
+                int sum_x=0;
+                int sum_y=0;
                 while (myTouch.dataAvailable()) {
+                  loop_count++;
                   lastObj=NULL;
-                  delay(250);
+                  //delay(250);
                   Serial.print("B");
                   myTouch.read();
                   touch_x=myTouch.getX();
                   touch_y=myTouch.getY();
+                  sum_x+=touch_x;
+                  sum_y+=touch_y;
                    Serial.print("C");
                  // Get the object under the pointer
                    Serial.print("_C2_");
                   if (current_displayed_gui_screen_OBJ!=NULL) {
-                    lastObj = current_displayed_gui_screen_OBJ->test_touch(touch_x,touch_y);
+                    lastObj = current_displayed_gui_screen_OBJ->test_touch(sum_x/loop_count,sum_y/loop_count);
                     Serial.print("_C3_");
                     if (lastObj==obj) {
                       Serial.print("_C4_");
@@ -584,8 +590,8 @@ void process_touch_screen(){
                        // Serial.println("lastObj==obj and btn status is UP");
                       Serial.print("D");
 
-                        ((GUI_Button*) obj)->btn_status=GUI_BUTTON_DOWN;
-                      //  obj->draw(myGLCD);
+                        ((GUI_Button*) obj)->setStatus(GUI_BUTTON_DOWN);
+                        obj->draw(myGLCD);
                         Serial.print("E");
 
                         //delay(100);
@@ -596,9 +602,9 @@ void process_touch_screen(){
                   //  Serial.println("lastObj != obj");
   
                     if (((GUI_Button*) obj)->btn_status==GUI_BUTTON_DOWN) {
-                      ((GUI_Button*) obj)->btn_status=GUI_BUTTON_UP;
-                     // obj->draw(myGLCD);
-                     // delay(100);
+                      ((GUI_Button*) obj)->setStatus(GUI_BUTTON_UP);
+                      obj->draw(myGLCD);
+                      //delay(100);
                     }
                   }
                 }
@@ -623,7 +629,7 @@ void process_touch_screen(){
                       Serial.print("G");
                 if (obj->action != NULL){
                   ((GUI_Button*) obj)->btn_status=GUI_BUTTON_UP;
-               //   obj->draw(myGLCD);
+                  obj->draw(myGLCD);
                   obj->action();
                       Serial.print("H");
                 }
@@ -634,8 +640,8 @@ void process_touch_screen(){
 //              }
                 if (obj != NULL){
                       Serial.print("I");
-                  ((GUI_Button*) obj)->btn_status=GUI_BUTTON_UP;
-                //  obj->draw(myGLCD);
+                  ((GUI_Button*) obj)->setStatus(GUI_BUTTON_UP);
+                      obj->draw(myGLCD);
                       Serial.print("J");
                 }
               }             

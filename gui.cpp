@@ -105,6 +105,12 @@ GUI_Button:: GUI_Button(int x,int y,int xsize,int ysize,String text,boolean enab
     this->need_refresh=true;  
 }
 
+void GUI_Button::setStatus(gui_button_status new_button_status){
+  this->btn_status=new_button_status;
+  this->need_refresh=true;  
+}
+
+
 void GUI_Button:: setText(String text)
 {
   this->text=text;
@@ -249,9 +255,9 @@ GUI_Object * GUI_Screen::test_touch(int x,int y){
         Serial.println("TT_B");
         return btn;
       }
-     Serial.println("TT_C");
-     obj=obj->next;
+      Serial.println("TT_C");
     }
+    obj=obj->next;
     
   }
 /*
