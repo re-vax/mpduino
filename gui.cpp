@@ -57,12 +57,12 @@ void GUI_Label:: draw(UTFT glcd)
    this->need_refresh=false;
 }
 
-GUI_Button:: GUI_Button(int x1,int y1,int xsize,int ysize)
+GUI_Button:: GUI_Button(int x,int y,int xsize,int ysize)
 
 {
     type  = GUI_OBJECT_TYPE_BUTTON;
-    this->x1=x1;
-    this->y1=y1;
+    this->x=x;
+    this->y=y;
     this->xsize=xsize;
     this->ysize=ysize;
     this->text=String();
@@ -72,13 +72,13 @@ GUI_Button:: GUI_Button(int x1,int y1,int xsize,int ysize)
     //GUI_Button(x1,y1,xsize,ysize,String());
 }
 
-GUI_Button:: GUI_Button(int x1,int y1,int xsize,int ysize,String text)
+GUI_Button:: GUI_Button(int x,int y,int xsize,int ysize,String text)
 
 {
 //    GUI_Button(x1,y1,xsize,ysize,text, true);
     type  = GUI_OBJECT_TYPE_BUTTON;
-    this->x1=x1;
-    this->y1=y1;
+    this->x=x;
+    this->y=y;
     this->xsize=xsize;
     this->ysize=ysize;
     this->text=text;
@@ -89,11 +89,11 @@ GUI_Button:: GUI_Button(int x1,int y1,int xsize,int ysize,String text)
 //  GUI_Button(x1,y1,x2,y2,label,true);
 
 
-GUI_Button:: GUI_Button(int x1,int y1,int xsize,int ysize,String text,boolean enabled)
+GUI_Button:: GUI_Button(int x,int y,int xsize,int ysize,String text,boolean enabled)
 {
     type  = GUI_OBJECT_TYPE_BUTTON;
-    this->x1=x1;
-    this->y1=y1;
+    this->x=x;
+    this->y=y;
     this->xsize=xsize;
     this->ysize=ysize;
     this->text=text;
@@ -134,30 +134,29 @@ void GUI_Button::draw(UTFT glcd)
     case GUI_BUTTON_UP:
       glcd.setBackColor(buttonColor);
       glcd.setColor(buttonColor);
-      glcd.fillRoundRect (x1, y1, x1+xsize-1, y1+ysize-1);
+      glcd.fillRoundRect (x, y, x+xsize-1, y+ysize-1);
       glcd.setColor(borderColor);
-      glcd.drawRoundRect (x1, y1, x1+xsize-1, y1+ysize-1);
+      glcd.drawRoundRect (x, y, x+xsize-1, y+ysize-1);
       glcd.setColor(textColor);
-      glcd.print(text,x1+5,y1+3);
+      glcd.print(text,x+5,y+3);
     break;
     case GUI_BUTTON_DOWN:
       glcd.setBackColor(pressedButtonColor);
       glcd.setColor(pressedButtonColor);
-      glcd.fillRoundRect (x1, y1, x1+xsize-1, y1+ysize-1);
+      glcd.fillRoundRect (x, y, x+xsize-1, y+ysize-1);
       glcd.setColor(borderColor);
-      glcd.drawRoundRect (x1, y1, x1+xsize-1, y1+ysize-1);
+      glcd.drawRoundRect (x, y, x+xsize-1, y+ysize-1);
       glcd.setColor(textColor);
-      glcd.print(text,x1+5,y1+3);
+      glcd.print(text,x+5,y+3);
     break;
     case GUI_BUTTON_GRAYED:
       glcd.setBackColor(VGA_SILVER);
       glcd.setColor(VGA_SILVER);
-      glcd.fillRoundRect (x1, y1, x1+xsize-1, y1+ysize-1);
+      glcd.fillRoundRect (x, y, x+xsize-1, y+ysize-1);
       glcd.setColor(VGA_SILVER);
-      glcd.drawRoundRect (x1, y1, x1+xsize-1, y1+ysize-1);
-//      glcd.drawRect (x1+1, y1+1, x2-1, y2-1);
+      glcd.drawRoundRect (x, y, x+xsize-1, y+ysize-1);
       glcd.setColor(VGA_GRAY);
-      glcd.print(text,x1+5,y1+3);
+      glcd.print(text,x+5,y+3);
     break;
   }
   this->need_refresh=false;
@@ -241,14 +240,19 @@ GUI_Object * GUI_Screen::test_touch(int x,int y){
   GUI_ObjectList *obj=this->root;
   if (obj==NULL) return NULL;
   else
+  
   while (obj!=NULL) {
+    Serial.println("TT_A");
     if (obj->obj->type == GUI_OBJECT_TYPE_BUTTON) {
       GUI_Button *btn=(GUI_Button*)(obj->obj);
-      if (x>=btn->x1 && x<btn->x1+btn->xsize && y>=btn->y1 && y<btn->y1+btn->ysize ) {
+      if (x>=btn->x && x<btn->x+btn->xsize && y>=btn->y && y<btn->y+btn->ysize ) {
+        Serial.println("TT_B");
         return btn;
       }
+     Serial.println("TT_C");
      obj=obj->next;
     }
+    
   }
 /*
   while (obj->next!=NULL){

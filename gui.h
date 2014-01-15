@@ -62,15 +62,15 @@ class GUI_Button :  public GUI_Object
 {
 public:
 //  int type;
-  int x1,y1,xsize,ysize;
+  int x,y,xsize,ysize;
   int btn_status;
   String text;
   uint8_t* font;
   word buttonColor,textColor,borderColor,pressedButtonColor;
   //GUI_Button();
-  GUI_Button(int x1, int y1, int xsize, int ysize);
-  GUI_Button(int x1, int y1, int xsize, int ysize,String text);
-  GUI_Button(int x1, int y1, int xsize, int ysize,String text,boolean enabled);
+  GUI_Button(int x, int y, int xsize, int ysize);
+  GUI_Button(int x, int y, int xsize, int ysize,String text);
+  GUI_Button(int x, int y, int xsize, int ysize,String text,boolean enabled);
   void setText(String text);
   void setFont(uint8_t* font);
   void setColors(word buttonColor,word textColor,word borderColor,word pressedButtonColor);

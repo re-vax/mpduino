@@ -151,7 +151,8 @@ IPAddress local_ip(192,168,90, 177);
 boolean dhcp=true;
 IPAddress ip(192,168,90, 19);
 
-IPAddress mpd_ip(192,168,90,10);
+//IPAddress mpd_ip(192,168,90,10);
+IPAddress mpd_ip(172,17,30,114); // MobivAx on peymei-lan
 int mpd_port=6600;
 
 // Initialize the Ethernet server library
@@ -261,7 +262,7 @@ void draw_GUI(){
 
 //  sem_current_screen.semGive();
 }
-
+   
 void init_gui_test(){
      if (!gui_test.init_done) {
    // Serial.println("init_gui_test");
@@ -419,8 +420,8 @@ void draw_gui_mpd_player() {
   }
 
 //  myGLCD.drawBitmap(180,200-128,128,128,qrcode_revax_fr_export1);
-Serial.println(gui_mpd_player.list_obj());
-  gui_mpd_player.draw(myGLCD,true);
+//Serial.println(gui_mpd_player.list_obj());
+  gui_mpd_player.draw(myGLCD);
 
   myGLCD.drawLine(0,18,102,18);
   myGLCD.drawLine(102,18,102,85);
@@ -531,7 +532,6 @@ void action_button_setup(){
 
 void process_touch_screen(){
 
-//  Serial.print("process touch!");
   
   sem_process_touchscreen.semTake();
 //  if (process_touch_screen_in_progress) {
@@ -539,12 +539,13 @@ void process_touch_screen(){
 //  }
 
 //  process_touch_screen_in_progress=true;
-  if (myTouch.dataAvailable() && current_displayed_gui_screen_OBJ!=NULL) { 
+  if (myTouch.dataAvailable() && current_displayed_gui_screen_OBJ!=NULL) {
     myTouch.read();
     touch_x=myTouch.getX();
     touch_y=myTouch.getY();
-
+    sem_current_screen.semTake();
     GUI_Object * obj = current_displayed_gui_screen_OBJ->test_touch(touch_x,touch_y);
+    sem_current_screen.semGive();
     if (obj!=NULL) {
         if (obj->type==GUI_OBJECT_TYPE_BUTTON) {
           if (((GUI_Button*) obj)->btn_status==GUI_BUTTON_GRAYED) {
@@ -561,23 +562,34 @@ void process_touch_screen(){
 
               ((GUI_Button*) obj)->btn_status=GUI_BUTTON_DOWN;
               obj->draw(myGLCD);
-              delay(100);
-              
+              Serial.println("trace A");
               GUI_Object * lastObj;
               if (myTouch.dataAvailable()) {
                 while (myTouch.dataAvailable()) {
+                  lastObj=NULL;
+                  delay(250);
+                  Serial.print("B");
                   myTouch.read();
                   touch_x=myTouch.getX();
                   touch_y=myTouch.getY();
-                  // Get the object under the pointer
-                  lastObj = current_displayed_gui_screen_OBJ->test_touch(touch_x,touch_y);
-                  if (lastObj==obj) {
-                    if (((GUI_Button*) obj)->btn_status==GUI_BUTTON_UP) {
-                     // Serial.println("lastObj==obj and btn status is UP");
-  
-                      ((GUI_Button*) obj)->btn_status=GUI_BUTTON_DOWN;
-                      obj->draw(myGLCD);
-                      delay(100);
+                   Serial.print("C");
+                 // Get the object under the pointer
+                   Serial.print("_C2_");
+                  if (current_displayed_gui_screen_OBJ!=NULL) {
+                    lastObj = current_displayed_gui_screen_OBJ->test_touch(touch_x,touch_y);
+                    Serial.print("_C3_");
+                    if (lastObj==obj) {
+                      Serial.print("_C4_");
+                     if (((GUI_Button*) obj)->btn_status==GUI_BUTTON_UP) {
+                       // Serial.println("lastObj==obj and btn status is UP");
+                      Serial.print("D");
+
+                        ((GUI_Button*) obj)->btn_status=GUI_BUTTON_DOWN;
+                      //  obj->draw(myGLCD);
+                        Serial.print("E");
+
+                        //delay(100);
+                      }
                     }
                   }
                   else {
@@ -585,13 +597,14 @@ void process_touch_screen(){
   
                     if (((GUI_Button*) obj)->btn_status==GUI_BUTTON_DOWN) {
                       ((GUI_Button*) obj)->btn_status=GUI_BUTTON_UP;
-                      obj->draw(myGLCD);
-                      delay(100);
+                     // obj->draw(myGLCD);
+                     // delay(100);
                     }
                   }
                 }
               } else {
                 // Already released
+                Serial.println("trace AR");
                 lastObj=obj;
               }
 /*              
@@ -603,12 +616,16 @@ void process_touch_screen(){
               
               Serial.println("released");
 */
+                      Serial.print("F");
+
             if (lastObj==obj && ((GUI_Button*) obj)->btn_status==GUI_BUTTON_DOWN ) {
               //Serial.println("same obj and status is down");
+                      Serial.print("G");
                 if (obj->action != NULL){
                   ((GUI_Button*) obj)->btn_status=GUI_BUTTON_UP;
-                  obj->draw(myGLCD);
+               //   obj->draw(myGLCD);
                   obj->action();
+                      Serial.print("H");
                 }
               } else {
 //              if (lastObj!= NULL){
@@ -616,8 +633,10 @@ void process_touch_screen(){
 //                lastObj->draw(myGLCD);
 //              }
                 if (obj != NULL){
+                      Serial.print("I");
                   ((GUI_Button*) obj)->btn_status=GUI_BUTTON_UP;
-                  obj->draw(myGLCD);
+                //  obj->draw(myGLCD);
+                      Serial.print("J");
                 }
               }             
             }
@@ -626,6 +645,7 @@ void process_touch_screen(){
     } else {
 //      Serial.println("null obj returned by test_touch :(");
         // We wait for the touch to be released
+                      Serial.print("K");
         while (myTouch.dataAvailable()) {
           myTouch.read();
         }
@@ -1019,7 +1039,9 @@ void evt2s(int _evt)
   int local_mpc_status=mpc_status;
   sem_mpc_status.semGive();
 
-  if (local_mpc_status==MPC_CONNECTED) {
+  boolean DISABLED_AUTO_REFRESH=false;
+
+  if (local_mpc_status==MPC_CONNECTED && !DISABLED_AUTO_REFRESH) {
 
     sem_mpd_info.semTake();
     boolean need_update=update_mpd_info();
