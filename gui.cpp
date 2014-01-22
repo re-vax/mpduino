@@ -1,33 +1,83 @@
+#include <uText.h>
+
 #include "gui.h"
 
 extern uint8_t SmallFont[];
 extern uint8_t BigFont[];
 
+
 GUI_Object::GUI_Object()
 {
 	this->type  = GUI_OBJECT_TYPE_NONE;
         this->action=NULL;
+        this->callback=NULL;
+        this->visible=true;
 }
 
 void GUI_Object::setCallbackFunction(objectCallbackFunction action){
   this->action=action;
 }
 
+// *************   PROGRESSBAR **************
+GUI_ProgressBar::GUI_ProgressBar(int x,int y,int xsize,int ysize,int fill_percentage)
+{
+    type  = GUI_OBJECT_TYPE_PROGRESS_BAR;
+    this->x=x;
+    this->y=y;
+    this->xsize=xsize;
+    this->ysize=ysize;
+    this->fill_percentage=fill_percentage;
+    this->need_refresh=true;
+}
 
+void GUI_ProgressBar:: draw(UTFT glcd)
+{
+  if (xsize!=-1) {
+    if (visible) {
+      glcd.setColor(borderColor);
+      glcd.fillRoundRect (x, y, x+xsize-1, y+ysize-1);
+      glcd.setColor(fillColor);
+      glcd.fillRect (x+3, y+2, x+ fill_percentage*(xsize-6)/100 , y+ysize-3);
+    } else {
+      glcd.setColor(this->gui_screen->backColor);
+      glcd.fillRoundRect (x, y, x+xsize-1, y+ysize-1);
+    }
+  }
+  this->need_refresh=false;
+  
+}
+
+void GUI_ProgressBar:: setColors(word borderColor,word fillColor){
+
+  this->borderColor=borderColor;
+  this->fillColor=fillColor;
+}
+
+
+// *************   LABEL **************
+// *************   LABEL **************
+// *************   LABEL **************
+
+//GUI_Label::GUI_Label(int x,int y,int xsize,int ysize,String text)
 GUI_Label::GUI_Label(int x,int y,String text)
 {
     type  = GUI_OBJECT_TYPE_LABEL;
     this->x=x;
     this->y=y;
+    this->xsize=-1;
+    this->ysize=-1;
     this->text=text;
     this->need_refresh=true;
 }
 
+//GUI_Label::GUI_Label(int x,int y,int xsize,int ysize)
 GUI_Label::GUI_Label(int x,int y)
 {
     type  = GUI_OBJECT_TYPE_LABEL;
     this->x=x;
     this->y=y;
+    this->xsize=-1;
+    this->ysize=-1;
     this->text=String();
     this->need_refresh=true;
 }
@@ -51,14 +101,30 @@ void GUI_Label::setColor(word textColor) {
 
 void GUI_Label:: draw(UTFT glcd)
 {
-   glcd.setColor(this->textColor);
-   glcd.setFont(this->font);
-   glcd.print(this->text,this->x,this->y);
-   this->need_refresh=false;
+  if (xsize!=-1) {
+    glcd.setColor(this->gui_screen->backColor);
+    glcd.fillRect (x, y, x+xsize-1, y+ysize-1);
+  }
+
+  glcd.setColor(this->textColor);
+  glcd.setFont(this->font);
+  glcd.print(this->text,this->x,this->y);
+
+  int font_width=glcd.getFontXsize();
+  int font_height=glcd.getFontYsize();
+
+  xsize=min(glcd.getDisplayXSize()-x , (this->text).length() * glcd.getFontXsize() );
+  ysize=min(glcd.getDisplayYSize()-y , glcd.getFontYsize() );
+
+  if (LABEL_DEBUG_BORDER) {
+    glcd.setColor(VGA_RED);
+    glcd.drawRect(x, y, x+xsize-1, y+ysize-1);
+  }
+  this->need_refresh=false;
+  
 }
 
 GUI_Button:: GUI_Button(int x,int y,int xsize,int ysize)
-
 {
     type  = GUI_OBJECT_TYPE_BUTTON;
     this->x=x;
@@ -136,6 +202,9 @@ void GUI_Button::draw(UTFT glcd)
 
   glcd.setFont(font);
 
+  int font_width=glcd.getFontXsize();
+  int font_height=glcd.getFontYsize();
+  int str_length=(this->text).length();
   switch (this->btn_status) {
     case GUI_BUTTON_UP:
       glcd.setBackColor(buttonColor);
@@ -144,7 +213,7 @@ void GUI_Button::draw(UTFT glcd)
       glcd.setColor(borderColor);
       glcd.drawRoundRect (x, y, x+xsize-1, y+ysize-1);
       glcd.setColor(textColor);
-      glcd.print(text,x+5,y+3);
+      glcd.print(text,x+((xsize-font_width*str_length)/2) ,y+ (ysize-font_height)/2  ) ;
     break;
     case GUI_BUTTON_DOWN:
       glcd.setBackColor(pressedButtonColor);
@@ -153,7 +222,7 @@ void GUI_Button::draw(UTFT glcd)
       glcd.setColor(borderColor);
       glcd.drawRoundRect (x, y, x+xsize-1, y+ysize-1);
       glcd.setColor(textColor);
-      glcd.print(text,x+5,y+3);
+      glcd.print(text,x+((xsize-font_width*str_length)/2) ,y+ (ysize-font_height)/2  ) ;
     break;
     case GUI_BUTTON_GRAYED:
       glcd.setBackColor(VGA_SILVER);
@@ -162,7 +231,7 @@ void GUI_Button::draw(UTFT glcd)
       glcd.setColor(VGA_SILVER);
       glcd.drawRoundRect (x, y, x+xsize-1, y+ysize-1);
       glcd.setColor(VGA_GRAY);
-      glcd.print(text,x+5,y+3);
+      glcd.print(text,x+((xsize-font_width*str_length)/2) ,y+ (ysize-font_height)/2  ) ;
     break;
   }
   this->need_refresh=false;
@@ -248,14 +317,14 @@ GUI_Object * GUI_Screen::test_touch(int x,int y){
   else
   
   while (obj!=NULL) {
-    Serial.println("TT_A");
+  //  Serial.println("TT_A");
     if (obj->obj->type == GUI_OBJECT_TYPE_BUTTON) {
       GUI_Button *btn=(GUI_Button*)(obj->obj);
       if (x>=btn->x && x<btn->x+btn->xsize && y>=btn->y && y<btn->y+btn->ysize ) {
-        Serial.println("TT_B");
+     //   Serial.println("TT_B");
         return btn;
       }
-      Serial.println("TT_C");
+    //  Serial.println("TT_C");
     }
     obj=obj->next;
     
