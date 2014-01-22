@@ -1158,11 +1158,6 @@ boolean update_mpd_info(){
              }
              if (currentLine.endsWith("stop")) {
                mpd_info.state=MPD_STATE_STOP;
-                mpd_info.file=String();
-                mpd_info.artist=String();
-                mpd_info.album=String();
-                mpd_info.title=String();
-                mpd_info.album_date=String();
              }
              if (currentLine.endsWith("pause")) {
                mpd_info.state=MPD_STATE_PAUSE;
@@ -1184,7 +1179,13 @@ boolean update_mpd_info(){
 
   if (mpd_info.songid != old_mpd_info.songid) {
 
-    
+    mpd_info.file=String();
+    mpd_info.artist=String();
+    mpd_info.album=String();
+    mpd_info.title=String();
+    mpd_info.album_date=String();
+    mpd_info.length=-1;
+ 
     count=0;
     sendMPDCommandAndWaitForResponse("currentsong");
     if (mpc.available()) {
@@ -1207,6 +1208,9 @@ boolean update_mpd_info(){
                mpd_info.album_date=currentLine.substring(currentLine.indexOf(":")+2);
              } else if (currentLine.startsWith("file:")) {
                mpd_info.file=currentLine.substring(currentLine.indexOf(":")+2);
+              // For streams
+             } else if (currentLine.startsWith("Name:")) {
+               mpd_info.title=currentLine.substring(currentLine.indexOf(":")+2);
              }        
            currentLine=String();
         } else { 
