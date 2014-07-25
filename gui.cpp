@@ -1,10 +1,15 @@
-#include <uText.h>
+//#include <uText.h>
 
 #include "gui.h"
 
 extern uint8_t SmallFont[];
 extern uint8_t BigFont[];
 
+
+
+// *************   OBJECT  **************
+// *************   OBJECT  **************
+// *************   OBJECT  **************
 
 GUI_Object::GUI_Object()
 {
@@ -18,7 +23,13 @@ void GUI_Object::setCallbackFunction(objectCallbackFunction action){
   this->action=action;
 }
 
+
+
+
 // *************   PROGRESSBAR **************
+// *************   PROGRESSBAR **************
+// *************   PROGRESSBAR **************
+
 GUI_ProgressBar::GUI_ProgressBar(int x,int y,int xsize,int ysize,int fill_percentage)
 {
     type  = GUI_OBJECT_TYPE_PROGRESS_BAR;
@@ -51,6 +62,79 @@ void GUI_ProgressBar:: setColors(word borderColor,word fillColor){
 
   this->borderColor=borderColor;
   this->fillColor=fillColor;
+}
+
+
+
+
+
+// *************   SLIDER  **************
+// *************   SLIDER  **************
+// *************   SLIDER  **************
+
+GUI_Slider::GUI_Slider(int x, int y, int xsize, int ysize,GUI_Slider_type slider_type, int pos){
+    type = GUI_OBJECT_TYPE_SLIDER;
+    this->x=x;
+    this->y=y;
+    this->xsize=xsize;
+    this->ysize=ysize;
+    this->pos=pos;
+    this->slider_type=slider_type;
+    this->slider_status=GUI_SLIDER_UP;
+    this->need_refresh=true;
+  
+}
+
+void   GUI_Slider::setColors(word borderColor,word sliderColor,word pressedSliderColor){
+  this->borderColor=borderColor;
+  this->sliderColor=sliderColor;
+  this->pressedSliderColor=pressedSliderColor;
+
+}
+
+void GUI_Slider:: setPos(int new_slider_pos){
+  this->pos=new_slider_pos;
+  this->need_refresh=true;
+}
+
+void GUI_Slider:: setStatus(gui_slider_status new_slider_status){
+  this->slider_status= new_slider_status;
+  this->need_refresh=true;
+}
+
+void GUI_Slider:: draw(UTFT glcd)
+{
+  if (xsize!=-1) {
+    if (visible) {
+      glcd.setColor(borderColor);
+      glcd.fillRoundRect (x, y, x+xsize-1, y+ysize-1);
+//      glcd.setColor(fillColor);
+//      glcd.fillRect (x+3, y+2, x+ pos*(xsize-6)/100 , y+ysize-3);
+      switch (slider_status) {
+        case GUI_SLIDER_UP:
+          glcd.setColor(sliderColor);
+          break;
+        case GUI_SLIDER_DOWN:
+          glcd.setColor(sliderColor);
+          break;
+        case GUI_SLIDER_GRAYED:
+          glcd.setColor(borderColor);
+          break;
+      }
+
+      if (slider_type == GUI_Slider_type_vertical ){ 
+        glcd.fillRoundRect (x-5,y+pos*(ysize)/100-5, x+xsize+4, y+pos*(ysize)/100+4);
+      }else if (slider_type == GUI_Slider_type_horizontal ){     
+        glcd.fillRoundRect (x+pos*(xsize)/100-5, y-5, x+pos*(xsize)/100+4, y+ysize+4);
+      }
+      
+    } else {
+      glcd.setColor(this->gui_screen->backColor);
+      glcd.fillRoundRect (x, y, x+xsize-1, y+ysize-1);
+    }
+  }
+  this->need_refresh=false;
+  
 }
 
 
@@ -124,6 +208,11 @@ void GUI_Label:: draw(UTFT glcd)
   
 }
 
+
+// *************  BUTTON  **************
+// *************  BUTTON  **************
+// *************  BUTTON  **************
+
 GUI_Button:: GUI_Button(int x,int y,int xsize,int ysize)
 {
     type  = GUI_OBJECT_TYPE_BUTTON;
@@ -138,8 +227,8 @@ GUI_Button:: GUI_Button(int x,int y,int xsize,int ysize)
     //GUI_Button(x1,y1,xsize,ysize,String());
 }
 
-GUI_Button:: GUI_Button(int x,int y,int xsize,int ysize,String text)
 
+GUI_Button:: GUI_Button(int x,int y,int xsize,int ysize,String text)
 {
 //    GUI_Button(x1,y1,xsize,ysize,text, true);
     type  = GUI_OBJECT_TYPE_BUTTON;
@@ -239,6 +328,11 @@ void GUI_Button::draw(UTFT glcd)
 }
 
 
+
+// *************  SCREEN  **************
+// *************  SCREEN  **************
+// *************  SCREEN  **************
+
 GUI_Screen::  GUI_Screen(){
   this->root=NULL;
   this->defaultFont=NULL;
@@ -318,14 +412,29 @@ GUI_Object * GUI_Screen::test_touch(int x,int y){
   
   while (obj!=NULL) {
   //  Serial.println("TT_A");
-    if (obj->obj->type == GUI_OBJECT_TYPE_BUTTON) {
-      GUI_Button *btn=(GUI_Button*)(obj->obj);
-      if (x>=btn->x && x<btn->x+btn->xsize && y>=btn->y && y<btn->y+btn->ysize ) {
-     //   Serial.println("TT_B");
-        return btn;
+    
+    switch (obj->obj->type) {
+      case GUI_OBJECT_TYPE_BUTTON: {
+          GUI_Button *btn=(GUI_Button*)(obj->obj);
+          if (x>=btn->x && x<btn->x+btn->xsize && y>=btn->y && y<btn->y+btn->ysize ) {
+            return btn;
+          }
       }
+      break;
+      
+      case GUI_OBJECT_TYPE_SLIDER: {
+      
+        GUI_Slider *slider=(GUI_Slider*)(obj->obj);
+        if (x>=slider->x && x<slider->x+slider->xsize && y>=slider->y && y<slider->y+slider->ysize ) {
+       //   Serial.println("TT_B");
+          return slider;
+        }
+      }
+      break;
+      
     //  Serial.println("TT_C");
     }
+    
     obj=obj->next;
     
   }

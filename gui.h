@@ -46,6 +46,11 @@ enum gui_slider_status {
   GUI_SLIDER_GRAYED
 };
 
+enum GUI_Slider_type {
+  GUI_Slider_type_vertical,
+  GUI_Slider_type_horizontal
+};
+
 // just a class definition
 class GUI_Screen;
 
@@ -103,17 +108,16 @@ class GUI_Slider: public GUI_Object
 {
   public:
   int x,y,xsize,ysize;
+  int pos;
+  GUI_Slider_type slider_type;
   int slider_status;
-  String text;
-  uint8_t* font;
-  word buttonColor,textColor,borderColor,pressedButtonColor;
-  GUI_Slider(int x, int y, int xsize, int ysize);
-  GUI_Slider(int x, int y, int xsize, int ysize,String text);
-  GUI_Slider(int x, int y, int xsize, int ysize,String text,boolean enabled);
-  void setText(String text);
+  word sliderColor,borderColor,pressedSliderColor;
+//  GUI_Slider(int x, int y, int xsize, int ysize,GUI_Slider_type slider_type);
+  GUI_Slider(int x, int y, int xsize, int ysize,GUI_Slider_type slider_type, int pos);
+//  GUI_Slider(int x, int y, int xsize, int ysize,GUI_Slider_type slider_type, int pos,boolean enabled);
   void setStatus(gui_slider_status new_slider_status);
-  void setFont(uint8_t* font);
-  void setColors(word sliderColor,word textColor,word borderColor,word pressedSliderColor);
+  void setPos(int new_slider_pos);
+  void setColors(word borderColor,word sliderColor,word pressedSliderColor);
   virtual void draw(UTFT glcd);
 };
 
@@ -133,7 +137,7 @@ class GUI_ProgressBar: public GUI_Object{
 class GUI_Label :  public GUI_Object
 {
 public:
-  int x,y,xsize,ysize;
+  unsigned int x,y,xsize,ysize;
   String text;
   word textColor;
   uint8_t* font;

@@ -140,6 +140,8 @@ GUI_ProgressBar *MPD_PLAYER_progress_bar_current_track;
 GUI_Button *button_setup;
 GUI_Button *MPD_PLAYER_button_favorite;
 
+GUI_Slider *MPD_PLAYER_slider_volume;
+
 // --------- /MPD PLAYER ---------- 
 
 // ---------  SETUP ---------- 
@@ -176,12 +178,16 @@ GUI_Button *button_test1;
 // The IP address will be dependent on your local network:
 byte mac[] = { 
   0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED };
-IPAddress local_ip(192,168,90, 177);
+//IPAddress local_ip(192,168,90,177);
 boolean dhcp=true;
-IPAddress ip(192,168,90, 19);
+//boolean dhcp=false;
+//IPAddress ip(192,168,90, 19);
+IPAddress ip(192,168,43,19);
 
-//IPAddress mpd_ip(192,168,90,10);
-IPAddress mpd_ip(172,17,30,114); // MobivAx on peymei-lan
+//IPAddress mpd_ip(192,168,90,10); // pi1 on kervax-lan
+//IPAddress mpd_ip(172,17,30,114); // MobivAx on peymei-lan (with dnat to vaxbuntu)
+IPAddress mpd_ip(192,168,43,117); //  vaxbuntu on vAxNote AP
+
 int mpd_port=6600;
 
 // Initialize the Ethernet server library
@@ -440,7 +446,10 @@ void init_gui_mpd_player(){
     MPD_PLAYER_progress_bar_current_track->visible=false;
     gui_mpd_player.add(MPD_PLAYER_progress_bar_current_track);
     
-
+    MPD_PLAYER_slider_volume=new GUI_Slider(20,210,200,20,GUI_Slider_type_horizontal,mpd_info.volume);
+    MPD_PLAYER_slider_volume->setColors(VGA_BLUE,VGA_WHITE,VGA_GREEN);
+    gui_mpd_player.add(MPD_PLAYER_slider_volume);
+    
 
     // init done
     gui_mpd_player.init_done=true;
@@ -474,6 +483,8 @@ void draw_gui_mpd_player(boolean fullRedraw) {
     button_previous_track->setStatus(GUI_BUTTON_UP);
     button_next_track->setStatus(GUI_BUTTON_UP);
     button_stop->setStatus(GUI_BUTTON_UP);
+    MPD_PLAYER_slider_volume->setStatus(GUI_SLIDER_UP);
+    MPD_PLAYER_slider_volume->setPos(mpd_info.volume);
     
     if (mpd_info.state==MPD_STATE_PLAY || mpd_info.state==MPD_STATE_PAUSE) {
       label_artist->setText(mpd_info.artist);
@@ -490,15 +501,18 @@ void draw_gui_mpd_player(boolean fullRedraw) {
       MPD_PLAYER_progress_bar_current_track->need_refresh=true;
 
     } else {
+      // The player is stopped: nothing to display (or maybe the first track in playlist?)
       label_artist->setText(String());
       label_title->setText(String());
       label_album->setText(String());
       label_date->setText(String());
       MPD_PLAYER_progress_bar_current_track->visible=false;
+      MPD_PLAYER_progress_bar_current_track->need_refresh=true;
     }
 
-  } else {
 
+  } else {
+    // Not connected
     label_mpd_status->setText("Disconnected from MPD");
     button_play->setStatus(GUI_BUTTON_GRAYED);
     button_previous_track->setStatus(GUI_BUTTON_GRAYED);
@@ -508,6 +522,9 @@ void draw_gui_mpd_player(boolean fullRedraw) {
     label_title->setText(String());
     label_album->setText(String());
     label_date->setText(String());
+    MPD_PLAYER_slider_volume->setStatus(GUI_SLIDER_GRAYED);
+    MPD_PLAYER_progress_bar_current_track->visible=false;
+    MPD_PLAYER_progress_bar_current_track->need_refresh=true; // TODO: implement the setVisible() function witch set the need_refresh flag 
   }
   
 //  myGLCD.drawBitmap(180,200-128,128,128,qrcode_revax_fr_export1);
@@ -791,96 +808,160 @@ void process_touch_screen(){
     sem_current_screen.semTake();
     GUI_Object * obj = current_displayed_gui_screen_OBJ->test_touch(touch_x,touch_y);
     sem_current_screen.semGive();
-    if (obj!=NULL) {
-      
-      // ************ BUTTON ***************
-        
-        switch (obj->type) {
-          case GUI_OBJECT_TYPE_BUTTON:
-            if (((GUI_Button*) obj)->btn_status==GUI_BUTTON_GRAYED) {
-            //  Serial.println("grayed button");
-            } else {
-              if (((GUI_Button*) obj)->btn_status==GUI_BUTTON_UP) {
-                ((GUI_Button*) obj)->btn_status=GUI_BUTTON_DOWN;
-                obj->draw(myGLCD);
-               // Serial.println("trace A");
-                GUI_Object * lastObj;
-                if (myTouch.dataAvailable()) {
-                  int loop_count=0;
-                  int sum_x=0;
-                  int sum_y=0;
-                  while (myTouch.dataAvailable()) {
-                    loop_count++;
-                    lastObj=NULL;
-                    myTouch.read();
-                    touch_x=myTouch.getX();
-                    touch_y=myTouch.getY();
-                    sum_x+=touch_x;
-                    sum_y+=touch_y;
-//                    lastObj = current_displayed_gui_screen_OBJ->test_touch(sum_x/loop_count,sum_y/loop_count);
-                    lastObj = current_displayed_gui_screen_OBJ->test_touch(touch_x,touch_y);
-                    if (lastObj==obj) {
-                     if (((GUI_Button*) obj)->btn_status==GUI_BUTTON_UP) {
-                          ((GUI_Button*) obj)->setStatus(GUI_BUTTON_DOWN);
-                          obj->draw(myGLCD);
-                        }
-                      }
-                    else {
-                      if (((GUI_Button*) obj)->btn_status==GUI_BUTTON_DOWN) {
-                        ((GUI_Button*) obj)->setStatus(GUI_BUTTON_UP);
+    if (obj!=NULL) {  
+      switch (obj->type) {
+        // ************ BUTTON ***************        
+        case GUI_OBJECT_TYPE_BUTTON:
+          if (((GUI_Button*) obj)->btn_status==GUI_BUTTON_GRAYED) {
+          //  Serial.println("grayed button");
+          } else {
+            if (((GUI_Button*) obj)->btn_status==GUI_BUTTON_UP) {
+              ((GUI_Button*) obj)->btn_status=GUI_BUTTON_DOWN;
+              obj->draw(myGLCD);
+             // Serial.println("trace A");
+              GUI_Object * lastObj;
+              if (myTouch.dataAvailable()) {
+               // int loop_count=0;
+               // int sum_x=0;
+               // int sum_y=0;
+                while (myTouch.dataAvailable()) {
+                 // loop_count++;
+                  lastObj=NULL;
+                  myTouch.read();
+                  touch_x=myTouch.getX();
+                  touch_y=myTouch.getY();
+                  //sum_x+=touch_x;
+                  //sum_y+=touch_y;
+  //                    lastObj = current_displayed_gui_screen_OBJ->test_touch(sum_x/loop_count,sum_y/loop_count);
+                  lastObj = current_displayed_gui_screen_OBJ->test_touch(touch_x,touch_y);
+                  if (lastObj==obj) {
+                   if (((GUI_Button*) obj)->btn_status==GUI_BUTTON_UP) {
+                        ((GUI_Button*) obj)->setStatus(GUI_BUTTON_DOWN);
                         obj->draw(myGLCD);
                       }
                     }
+                  else {
+                    if (((GUI_Button*) obj)->btn_status==GUI_BUTTON_DOWN) {
+                      ((GUI_Button*) obj)->setStatus(GUI_BUTTON_UP);
+                      obj->draw(myGLCD);
+                    }
                   }
-                } else {
-                  // Already released
-                  lastObj=obj;
                 }
-              if (lastObj==obj && ((GUI_Button*) obj)->btn_status==GUI_BUTTON_DOWN ) {
-
-                  ((GUI_Button*) obj)->btn_status=GUI_BUTTON_UP;
-                  obj->draw(myGLCD);
-
-                  // Old style callback system
-                  if (obj->action != NULL){
-                    obj->action();
+              } else {
+                // Already released
+                lastObj=obj;
+              }
+            if (lastObj==obj && ((GUI_Button*) obj)->btn_status==GUI_BUTTON_DOWN ) {
+  
+                ((GUI_Button*) obj)->btn_status=GUI_BUTTON_UP;
+                obj->draw(myGLCD);
+  
+                // Old style callback system
+                if (obj->action != NULL){
+                  obj->action();
+                }
+                
+                if (obj->callback!=NULL){
+                  struct event_cb *callback=obj->callback;
+                  if (callback!=NULL && callback->cb!=NULL){
+                    Serial.println("Call the callback function");
+                    callback->cb(callback->data);
                   }
-                  
-                  if (obj->callback!=NULL){
-                    struct event_cb *callback=obj->callback;
-                    if (callback!=NULL && callback->cb!=NULL){
-                      Serial.println("Call the callback function");
-                      callback->cb(callback->data);
+                }
+                
+              } else {
+                
+                if (lastObj!= NULL){
+                  ((GUI_Button*) lastObj)->btn_status=GUI_BUTTON_UP;
+                  lastObj->draw(myGLCD);
+                }
+                
+                if (obj != NULL){
+                   //   Serial.print("I");
+                  ((GUI_Button*) obj)->setStatus(GUI_BUTTON_UP);
+                      obj->draw(myGLCD);
+                   //   Serial.print("J");
+                }
+              }             
+            }                        
+          }
+        
+        break;
+        
+        // SLIDER
+        
+        case GUI_OBJECT_TYPE_SLIDER:
+          if (((GUI_Slider*) obj)->slider_status==GUI_SLIDER_GRAYED) {
+          //  Serial.println("grayed slider");
+          } else {
+            if (((GUI_Slider*) obj)->slider_status==GUI_SLIDER_UP) {
+              ((GUI_Slider*) obj)->slider_status=GUI_SLIDER_DOWN;
+              obj->draw(myGLCD);
+             // Serial.println("trace A");
+              GUI_Object * lastObj;
+              if (myTouch.dataAvailable()) {
+                while (myTouch.dataAvailable()) {
+                  lastObj=NULL;
+                  myTouch.read();
+                  touch_x=myTouch.getX();
+                  touch_y=myTouch.getY();
+                  lastObj = current_displayed_gui_screen_OBJ->test_touch(touch_x,touch_y);
+                  if (lastObj==obj) {
+                   if (((GUI_Slider*) obj)->slider_status==GUI_SLIDER_UP) {
+                        ((GUI_Slider*) obj)->setStatus(GUI_SLIDER_DOWN);
+                        obj->draw(myGLCD);
+                      }
+                    }
+                  else {
+                    if (((GUI_Slider*) obj)->slider_status==GUI_SLIDER_DOWN) {
+                      ((GUI_Slider*) obj)->setStatus(GUI_SLIDER_UP);
+                      obj->draw(myGLCD);
                     }
                   }
-                  
-                } else {
-                  
-                  if (lastObj!= NULL){
-                    ((GUI_Button*) lastObj)->btn_status=GUI_BUTTON_UP;
-                    lastObj->draw(myGLCD);
+                }
+              } else {
+                // Already released
+                lastObj=obj;
+              }
+            if (lastObj==obj && ((GUI_Slider*) obj)->slider_status==GUI_SLIDER_DOWN ) {
+  
+                ((GUI_Slider*) obj)->slider_status=GUI_SLIDER_UP;
+                obj->draw(myGLCD);
+  
+                // Old style callback system
+                if (obj->action != NULL){
+                  obj->action();
+                }
+                
+                if (obj->callback!=NULL){
+                  struct event_cb *callback=obj->callback;
+                  if (callback!=NULL && callback->cb!=NULL){
+                    Serial.println("Call the callback function");
+                    callback->cb(callback->data);
                   }
-                  
-                  if (obj != NULL){
-                     //   Serial.print("I");
-                    ((GUI_Button*) obj)->setStatus(GUI_BUTTON_UP);
-                        obj->draw(myGLCD);
-                     //   Serial.print("J");
-                  }
-                }             
-              }                        
-            }
+                }
+                
+              } else {
+                
+                if (lastObj!= NULL){
+                  ((GUI_Button*) lastObj)->btn_status=GUI_BUTTON_UP;
+                  lastObj->draw(myGLCD);
+                }
+                
+                if (obj != NULL){
+                   //   Serial.print("I");
+                  ((GUI_Button*) obj)->setStatus(GUI_BUTTON_UP);
+                      obj->draw(myGLCD);
+                   //   Serial.print("J");
+                }
+              }             
+            }                        
+          }
           
-          break;
-          
-          case GUI_OBJECT_TYPE_SLIDER:
-            
-          
-          break;
-          
-          
-          
-        }
+        
+        break;
+        
+      }
     } else {
 //      Serial.println("null obj returned by test_touch :(");
         // We wait for the touch to be released
@@ -1227,7 +1308,13 @@ boolean update_mpd_info(){
 //  Serial.print("byte read from mpc:");
 //  Serial.println(count);
 
-  if ( (old_mpd_info.state!=mpd_info.state) || (old_mpd_info.time!=mpd_info.time) || (!old_mpd_info.artist.equals(mpd_info.artist)) || (!old_mpd_info.album.equals(mpd_info.album)) || (!old_mpd_info.title.equals(mpd_info.title)) || (!old_mpd_info.album_date.equals(mpd_info.album_date)) ) {
+  if ( (old_mpd_info.state!=mpd_info.state) 
+  || (old_mpd_info.time!=mpd_info.time) 
+  || (old_mpd_info.volume!=mpd_info.volume) 
+  || (!old_mpd_info.artist.equals(mpd_info.artist)) 
+  || (!old_mpd_info.album.equals(mpd_info.album)) 
+  || (!old_mpd_info.title.equals(mpd_info.title)) 
+  || (!old_mpd_info.album_date.equals(mpd_info.album_date)) ) {
 //  if ( (!old_mpd_info.artist.equals(mpd_info.artist)) || (!old_mpd_info.album.equals(mpd_info.album)) || (!old_mpd_info.title.equals(mpd_info.title)) || (!old_mpd_info.album_date.equals(mpd_info.album_date)) ) {
     retval=true;
   }
@@ -1373,7 +1460,7 @@ void setup()
 
   
   // sd card initialisation
-  sdCardInit();
+//  sdCardInit();
 
   //  GFX init
 //  draw_background();
@@ -1386,7 +1473,6 @@ void setup()
   myGLCD.setBackColor(VGA_BLACK);
   myGLCD.setColor(VGA_GREEN);
   myGLCD.drawRoundRect (1, 1, 318, 238);
-  myGLCD.print("DHCP Client...",CENTER,50);
 
 
   // start the Ethernet connection
@@ -1395,8 +1481,10 @@ void setup()
   int connected=0;
   while (connected==0){
     if (dhcp) {
+      myGLCD.print("DHCP Client...",CENTER,50);
       connected=Ethernet.begin(mac);
     } else {
+      myGLCD.print("Static IP",CENTER,50);
       Ethernet.begin(mac,ip);
       connected=1;
     }
@@ -1407,7 +1495,7 @@ void setup()
 //  and the server:
 //  server.begin();
 //  Serial.print("Local IP:");
-  Serial.println(Ethernet.localIP());
+//  Serial.println(Ethernet.localIP());
 
   // System
   sem_mpd_info.semCreate("smi");
